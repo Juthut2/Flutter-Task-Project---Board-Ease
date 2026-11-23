@@ -1,0 +1,231 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentUid() {
+      return request.auth.uid;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && userId == currentUid();
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(currentUid())).data.role;
+    }
+
+    function isOwner() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(currentUid()))
+        && userRole() == 'owner';
+    }
+
+    function isTenant() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(currentUid()))
+        && userRole() == 'tenant';
+    }
+
+    function isNonEmptyString(value) {
+      return value is string && value.size() > 0;
+    }
+
+    function roomExists(roomId) {
+      return exists(/databases/$(database)/documents/rooms/$(roomId));
+    }
+
+    function roomData(roomId) {
+      return get(/databases/$(database)/documents/rooms/$(roomId)).data;
+    }
+
+    function isValidRoom(data) {
+      return isNonEmptyString(data.name)
+        && isNonEmptyString(data.description)
+        && data.monthlyRate is number
+        && data.monthlyRate > 0
+        && data.deposit is number
+        && data.deposit >= 0
+        && data.capacity is int
+        && data.capacity > 0
+        && data.amenities is list
+        && data.photos is list
+        && data.status in ['available', 'reserved', 'occupied']
+        && isNonEmptyString(data.province)
+        && isNonEmptyString(data.city)
+        && isNonEmptyString(data.barangay)
+        && isNonEmptyString(data.street)
+        && data.createdAt is timestamp
+        && (data.tenantId == null || data.tenantId is string)
+        && (data.status == 'available' || data.tenantId is string)
+        && (data.status != 'available' || data.tenantId == null);
+    }
+
+    // ---------------------------------------------------------------------
+    // Users: owners are provisioned manually in the Firebase console.
+    // ---------------------------------------------------------------------
+
+    match /users/{userId} {
+      // Owners can read tenant profiles for the tenant directory, but no
+      // one can read another account outside that admin use case.
+      allow read: if isSelf(userId)
+        || (isOwner() && resource.data.role == 'tenant');
+
+      allow create: if isSelf(userId)
+        && request.resource.data.role == 'tenant'
+        && isNonEmptyString(request.resource.data.name)
+        && isNonEmptyString(request.resource.data.email)
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.keys().hasAll([
+          'name', 'email', 'phone', 'role', 'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'name', 'email', 'phone', 'role', 'createdAt'
+        ]);
+
+      allow update: if isSelf(userId)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data)
+             .affectedKeys()
+             .hasOnly(['name', 'email', 'phone']);
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Rooms: every signed-in user can browse; only the owning owner can write.
+    // ---------------------------------------------------------------------
+
+    match /rooms/{roomId} {
+      allow read: if signedIn();
+
+      allow create: if isOwner()
+        && request.resource.data.ownerId == currentUid()
+        && request.resource.data.status == 'available'
+        && request.resource.data.tenantId == null
+        && isValidRoom(request.resource.data);
+
+      allow update: if isOwner()
+        && resource.data.ownerId == currentUid()
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && isValidRoom(request.resource.data);
+
+      allow delete: if isOwner() && resource.data.ownerId == currentUid();
+    }
+
+    // ---------------------------------------------------------------------
+    // Reservations
+    // ---------------------------------------------------------------------
+
+    match /reservations/{reservationId} {
+      allow read: if isOwner()
+        || (signedIn() && resource.data.tenantId == currentUid());
+
+      allow create: if isTenant()
+        && request.resource.data.tenantId == currentUid()
+        && request.resource.data.status == 'pending'
+        && isNonEmptyString(request.resource.data.roomId)
+        && roomExists(request.resource.data.roomId)
+        && roomData(request.resource.data.roomId).status == 'available'
+        && request.resource.data.moveInDate is timestamp
+        && request.resource.data.createdAt is timestamp;
+
+      allow update: if (
+          isOwner()
+          && roomData(resource.data.roomId).ownerId == currentUid()
+          && resource.data.status == 'pending'
+          && request.resource.data.status in ['approved', 'declined']
+          && request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasOnly(['status'])
+        ) || (
+          isTenant()
+          && resource.data.tenantId == currentUid()
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasOnly(['status'])
+        );
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Payments
+    // ---------------------------------------------------------------------
+
+    match /payments/{paymentId} {
+      allow read: if isOwner()
+        || (signedIn() && resource.data.tenantId == currentUid());
+
+      allow create: if isTenant()
+        && request.resource.data.tenantId == currentUid()
+        && request.resource.data.status == 'pending'
+        && isNonEmptyString(request.resource.data.roomId)
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && isNonEmptyString(request.resource.data.month)
+        && request.resource.data.month.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+        && request.resource.data.proofUrl is string
+        && request.resource.data.proofUrl.matches('^https://res\\.cloudinary\\.com/.+')
+        && request.resource.data.createdAt is timestamp;
+
+      allow update: if isOwner()
+        && roomData(resource.data.roomId).ownerId == currentUid()
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['verified', 'rejected']
+        && request.resource.data.diff(resource.data)
+             .affectedKeys()
+             .hasOnly(['status']);
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Maintenance requests
+    // ---------------------------------------------------------------------
+
+    match /maintenance/{requestId} {
+      allow read: if isOwner()
+        || (signedIn() && resource.data.tenantId == currentUid());
+
+      allow create: if isTenant()
+        && request.resource.data.tenantId == currentUid()
+        && request.resource.data.status == 'pending'
+        && isNonEmptyString(request.resource.data.roomId)
+        && isNonEmptyString(request.resource.data.title)
+        && isNonEmptyString(request.resource.data.description)
+        && (
+          request.resource.data.photoUrl == null
+          || (request.resource.data.photoUrl is string
+              && request.resource.data.photoUrl.matches(
+                  '^https://res\\.cloudinary\\.com/.+'))
+        )
+        && request.resource.data.createdAt is timestamp;
+
+      allow update: if isOwner()
+        && roomData(resource.data.roomId).ownerId == currentUid()
+        && request.resource.data.status in ['pending', 'in_progress', 'resolved']
+        && request.resource.data.diff(resource.data)
+             .affectedKeys()
+             .hasOnly(['status']);
+
+      allow delete: if false;
+    }
+
+    // Deny anything not explicitly allowed above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

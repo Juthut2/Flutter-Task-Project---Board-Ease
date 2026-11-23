@@ -1,0 +1,26 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "board-ease",
+          "appId": "1:322998595183:android:4108a4a892f74b9d6a679a",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "board-ease",
+          "configurations": {
+            "android": "1:322998595183:android:4108a4a892f74b9d6a679a",
+            "ios": "1:322998595183:ios:f0029a6ea2610c976a679a",
+            "web": "1:322998595183:web:f11ec26b7ac0d9276a679a"
+          }
+        }
+      }
+    }
+  }
+}

@@ -140,11 +140,62 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> signInWithGoogle() async {
+    _isLoading = true;
+    _errorMessage = null;
+    _safeNotify();
+    try {
+      final service = _authService ??= AuthService();
+      final credential = await service.signInWithGoogle();
+      final authUser = credential.user;
+      if (authUser == null) {
+        throw const AuthFailure('Could not sign in. Please try again.');
+      }
+
+      final existing = await service.fetchProfile(authUser.uid);
+      if (existing == null) {
+        final email = authUser.email?.trim() ?? '';
+        final displayName = authUser.displayName?.trim() ?? '';
+        final fallbackName = email.contains('@')
+            ? email.split('@').first.trim()
+            : '';
+        final name = displayName.isNotEmpty
+            ? displayName
+            : (fallbackName.isNotEmpty ? fallbackName : 'Tenant');
+        await service.createGoogleTenantProfile(
+          uid: authUser.uid,
+          name: name,
+          email: email,
+          photoUrl: authUser.photoURL,
+        );
+      }
+
+      await _completeSession(authUser, assumeVerified: true);
+      await _lockout.reset();
+      return true;
+    } on FirebaseAuthException catch (error) {
+      _errorMessage = friendlyAuthMessage(error);
+      return false;
+    } on AuthFailure catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } catch (_) {
+      _errorMessage =
+          'Could not sign in with Google. Check your connection and try again.';
+      return false;
+    } finally {
+      _isLoading = false;
+      _safeNotify();
+    }
+  }
+
   Future<bool> registerTenant({
     required String name,
     required String email,
     required String phone,
     required String password,
+    required String gender,
+    required DateTime birthday,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -156,6 +207,8 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         phone: phone,
         password: password,
+        gender: gender,
+        birthday: birthday,
       );
       final authUser = credential.user;
       if (authUser == null) {
@@ -172,6 +225,80 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {
       _errorMessage =
           'Could not create your account. Check your connection and try again.';
+      return false;
+    } finally {
+      _isLoading = false;
+      _safeNotify();
+    }
+  }
+
+  Future<bool> updateProfile({
+    required String name,
+    required String phone,
+    required String gender,
+    required DateTime birthday,
+  }) async {
+    final current = _user;
+    if (current == null) {
+      _errorMessage = 'You are not signed in.';
+      _safeNotify();
+      return false;
+    }
+
+    _isLoading = true;
+    _errorMessage = null;
+    _safeNotify();
+    try {
+      final service = _authService ??= AuthService();
+      await service.updateProfile(
+        uid: current.uid,
+        name: name,
+        phone: phone,
+        gender: gender,
+        birthday: birthday,
+      );
+      _user = current.copyWith(
+        name: name.trim(),
+        phone: phone.trim(),
+        gender: gender,
+        birthday: birthday,
+      );
+      return true;
+    } on AuthFailure catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } catch (_) {
+      _errorMessage =
+          'Could not update your profile. Check your connection and try again.';
+      return false;
+    } finally {
+      _isLoading = false;
+      _safeNotify();
+    }
+  }
+
+  Future<bool> updatePhotoUrl(String photoUrl) async {
+    final current = _user;
+    if (current == null) {
+      _errorMessage = 'You are not signed in.';
+      _safeNotify();
+      return false;
+    }
+
+    _isLoading = true;
+    _errorMessage = null;
+    _safeNotify();
+    try {
+      final service = _authService ??= AuthService();
+      await service.updatePhotoUrl(uid: current.uid, photoUrl: photoUrl);
+      _user = current.copyWith(photoUrl: photoUrl);
+      return true;
+    } on AuthFailure catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } catch (_) {
+      _errorMessage =
+          'Could not save your photo. Check your connection and try again.';
       return false;
     } finally {
       _isLoading = false;
@@ -218,7 +345,10 @@ class AuthProvider extends ChangeNotifier {
     _safeNotify();
   }
 
-  Future<void> _completeSession(User authUser) async {
+  Future<void> _completeSession(
+    User authUser, {
+    bool assumeVerified = false,
+  }) async {
     final service = _authService;
     if (service == null) {
       throw const AuthFailure('Authentication is unavailable.');
@@ -243,7 +373,7 @@ class AuthProvider extends ChangeNotifier {
     }
 
     _user = profile;
-    _status = authUser.emailVerified
+    _status = assumeVerified || authUser.emailVerified
         ? AuthStatus.authenticated
         : AuthStatus.unverified;
     _errorMessage = null;

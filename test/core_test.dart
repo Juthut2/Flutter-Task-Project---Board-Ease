@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rosalada_project_board_ease/core/validators.dart';
+import 'package:rosalada_project_board_ease/models/app_user.dart';
 import 'package:rosalada_project_board_ease/models/room.dart';
 
 void main() {
@@ -28,6 +29,58 @@ void main() {
       expect(Validators.amount('-5'), isNotNull);
       expect(Validators.amount('4500'), isNull);
     });
+
+    test('birthday requires an adult and no future date', () {
+      final now = DateTime.now();
+      expect(Validators.birthday(null), isNotNull);
+      expect(
+        Validators.birthday(DateTime(now.year - 20, now.month, now.day)),
+        isNull,
+      );
+      expect(
+        Validators.birthday(DateTime(now.year - 17, now.month, now.day)),
+        isNotNull,
+      );
+      expect(Validators.birthday(now.add(const Duration(days: 1))), isNotNull);
+    });
+  });
+
+  test('AppUser reads old profiles without profile fields', () {
+    final user = AppUser.fromMap('user-1', <String, dynamic>{
+      'name': 'Old Tenant',
+      'email': 'old@example.com',
+      'phone': '',
+      'role': 'tenant',
+      'createdAt': Timestamp.fromDate(DateTime(2025, 1, 1)),
+    });
+
+    expect(user.gender, isNull);
+    expect(user.birthday, isNull);
+    expect(user.photoUrl, isNull);
+    expect(user.hasCompleteProfile, isFalse);
+  });
+
+  test('AppUser profile fields round trip', () {
+    final user = AppUser(
+      uid: 'user-2',
+      name: 'Ana Cruz',
+      email: 'ana@example.com',
+      phone: '09171234567',
+      role: UserRole.tenant,
+      createdAt: DateTime(2026, 1, 1),
+      gender: 'female',
+      birthday: DateTime(1998, 5, 20),
+      photoUrl: 'https://res.cloudinary.com/demo/ana.jpg',
+    );
+
+    final map = user.toMap();
+    final restored = AppUser.fromMap('user-2', map);
+
+    expect(map['birthday'], isA<Timestamp>());
+    expect(restored.gender, 'female');
+    expect(restored.birthday, DateTime(1998, 5, 20));
+    expect(restored.photoUrl, user.photoUrl);
+    expect(restored.hasCompleteProfile, isTrue);
   });
 
   test('Room maps round trip', () {

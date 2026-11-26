@@ -35,6 +35,18 @@ class RoomService {
     });
   }
 
+  /// Live room directory for tenants, including occupied rooms so an active
+  /// rental can still be displayed after its room leaves the browse list.
+  Stream<List<Room>> watchAllRooms() {
+    return _rooms.snapshots().map((snapshot) {
+      final rooms = snapshot.docs
+          .map((doc) => Room.fromMap(doc.id, doc.data()))
+          .toList();
+      rooms.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return rooms;
+    });
+  }
+
   Future<void> createRoom(Room room) async {
     try {
       await _rooms.add(room.toMap());

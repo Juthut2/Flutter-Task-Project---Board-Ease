@@ -33,6 +33,87 @@ class ReservationService {
         );
   }
 
+  /// Live reservations that belong to one tenant, newest first.
+  Stream<List<Reservation>> watchTenantReservations(String tenantId) {
+    return _firestore
+        .collection(AppConstants.reservationsCollection)
+        .where('tenantId', isEqualTo: tenantId)
+        .snapshots()
+        .map((snapshot) {
+          final reservations = snapshot.docs
+              .map((doc) => Reservation.fromMap(doc.id, doc.data()))
+              .toList();
+          reservations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return reservations;
+        });
+  }
+
+  /// Creates a pending reservation after checking the requested move-in date.
+  Future<void> createReservation({
+    required String roomId,
+    required String tenantId,
+    required DateTime moveInDate,
+  }) async {
+    if (roomId.isEmpty || tenantId.isEmpty) {
+      throw const ReservationFailure('This request could not be prepared.');
+    }
+    final today = DateTime.now();
+    final date = DateTime(moveInDate.year, moveInDate.month, moveInDate.day);
+    final earliest = DateTime(today.year, today.month, today.day);
+    if (date.isBefore(earliest)) {
+      throw const ReservationFailure(
+        'Choose a move-in date from today onward.',
+      );
+    }
+    try {
+      await _firestore
+          .collection(AppConstants.reservationsCollection)
+          .add(
+            Reservation(
+              roomId: roomId,
+              tenantId: tenantId,
+              status: ReservationStatus.pending,
+              moveInDate: date,
+              createdAt: DateTime.now(),
+            ).toMap(),
+          );
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') {
+        throw const ReservationFailure(
+          'This room is no longer available for reservation. Browse other '
+          'rooms or refresh the list.',
+        );
+      }
+      throw ReservationFailure(friendlyDataMessage(error));
+    } catch (error) {
+      throw ReservationFailure(friendlyDataMessage(error));
+    }
+  }
+
+  /// Cancels a pending request owned by the signed-in tenant.
+  Future<void> cancelReservation(String reservationId) async {
+    if (reservationId.isEmpty) {
+      throw const ReservationFailure('This request could not be identified.');
+    }
+    try {
+      await _firestore
+          .collection(AppConstants.reservationsCollection)
+          .doc(reservationId)
+          .update(<String, dynamic>{
+            'status': ReservationStatus.cancelled.value,
+          });
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') {
+        throw const ReservationFailure(
+          'This request can no longer be cancelled. Refresh the list.',
+        );
+      }
+      throw ReservationFailure(friendlyDataMessage(error));
+    } catch (error) {
+      throw ReservationFailure(friendlyDataMessage(error));
+    }
+  }
+
   /// Approves or declines a pending request. Approval marks the room occupied
   /// inside the same transaction so two tenants cannot book it.
   Future<void> decide({

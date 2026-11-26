@@ -19,6 +19,10 @@ String friendlyAuthMessage(FirebaseAuthException error) {
       return 'Incorrect email or password.';
     case 'email-already-in-use':
       return 'An account already exists for this email.';
+    case 'account-exists-with-different-credential':
+    case 'credential-already-in-use':
+      return 'This email is already linked to another sign-in method. '
+          'Use your password to sign in.';
     case 'weak-password':
       return 'Choose a stronger password with letters and numbers.';
     case 'too-many-requests':

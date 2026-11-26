@@ -7,11 +7,13 @@ class DashboardAttentionCard extends StatelessWidget {
     required this.pending,
     required this.overdue,
     required this.onOpenReservations,
+    required this.onOpenOverdue,
   });
 
   final int pending;
   final int overdue;
   final VoidCallback onOpenReservations;
+  final VoidCallback onOpenOverdue;
 
   @override
   Widget build(BuildContext context) {
@@ -50,15 +52,25 @@ class DashboardAttentionCard extends StatelessWidget {
                 color: scheme.onSurfaceVariant,
               ),
             ),
-            if (pending > 0) ...[
+            if (pending > 0 || overdue > 0) ...[
               const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
-                  onPressed: onOpenReservations,
-                  icon: const Icon(Icons.rate_review_outlined),
-                  label: const Text('Review requests'),
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  if (pending > 0)
+                    FilledButton.tonalIcon(
+                      onPressed: onOpenReservations,
+                      icon: const Icon(Icons.rate_review_outlined),
+                      label: const Text('Review requests'),
+                    ),
+                  if (overdue > 0)
+                    OutlinedButton.icon(
+                      onPressed: onOpenOverdue,
+                      icon: const Icon(Icons.warning_amber_rounded),
+                      label: const Text('Review overdue'),
+                    ),
+                ],
               ),
             ],
           ],

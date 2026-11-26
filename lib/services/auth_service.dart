@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../core/constants.dart';
 import '../models/app_user.dart';
@@ -22,7 +23,77 @@ class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
 
+  static Future<void>? _googleInitialization;
+
   User? get currentUser => _auth.currentUser;
+
+  Future<void> _ensureGoogleInitialized() async {
+    final existing = _googleInitialization;
+    if (existing != null) return existing;
+    final future = GoogleSignIn.instance.initialize(
+      serverClientId: AppConstants.googleServerClientId.isEmpty
+          ? null
+          : AppConstants.googleServerClientId,
+    );
+    _googleInitialization = future;
+    try {
+      await future;
+    } catch (_) {
+      _googleInitialization = null;
+      rethrow;
+    }
+  }
+
+  Future<UserCredential> signInWithGoogle() async {
+    final google = GoogleSignIn.instance;
+    try {
+      await _ensureGoogleInitialized();
+    } on GoogleSignInException catch (error) {
+      throw _googleFailure(error);
+    } catch (_) {
+      throw const AuthFailure(
+        'Google sign-in is not available right now. Please try again.',
+      );
+    }
+
+    if (!google.supportsAuthenticate()) {
+      throw const AuthFailure(
+        'Google sign-in is not supported on this device.',
+      );
+    }
+
+    final GoogleSignInAccount account;
+    try {
+      account = await google.authenticate();
+    } on GoogleSignInException catch (error) {
+      throw _googleFailure(error);
+    } catch (_) {
+      throw const AuthFailure('Google sign-in failed. Please try again.');
+    }
+
+    final idToken = account.authentication.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const AuthFailure(
+        'Google sign-in did not return a valid credential. Please try again.',
+      );
+    }
+    final credential = GoogleAuthProvider.credential(idToken: idToken);
+    return _auth.signInWithCredential(credential);
+  }
+
+  AuthFailure _googleFailure(GoogleSignInException error) {
+    switch (error.code) {
+      case GoogleSignInExceptionCode.canceled:
+        return const AuthFailure('Google sign-in was cancelled.');
+      case GoogleSignInExceptionCode.clientConfigurationError:
+        return const AuthFailure(
+          'Google sign-in is not configured for this app. '
+          'Please contact the property owner.',
+        );
+      default:
+        return const AuthFailure('Google sign-in failed. Please try again.');
+    }
+  }
 
   Future<AppUser?> fetchProfile(String uid) async {
     final doc = await _firestore
@@ -50,6 +121,8 @@ class AuthService {
     required String email,
     required String phone,
     required String password,
+    required String gender,
+    required DateTime birthday,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
@@ -71,6 +144,8 @@ class AuthService {
         phone: phone.trim(),
         role: UserRole.tenant,
         createdAt: DateTime.now(),
+        gender: gender,
+        birthday: birthday,
       );
       await _firestore
           .collection(AppConstants.usersCollection)
@@ -92,6 +167,50 @@ class AuthService {
       }
       rethrow;
     }
+  }
+
+  /// Creates the Firestore profile for a first-time Google sign-in.
+  Future<void> createGoogleTenantProfile({
+    required String uid,
+    required String name,
+    required String email,
+    String? photoUrl,
+  }) async {
+    final profile = AppUser(
+      uid: uid,
+      name: name,
+      email: email,
+      role: UserRole.tenant,
+      createdAt: DateTime.now(),
+      photoUrl: photoUrl,
+    );
+    await _firestore
+        .collection(AppConstants.usersCollection)
+        .doc(uid)
+        .set(profile.toMap());
+  }
+
+  Future<void> updateProfile({
+    required String uid,
+    required String name,
+    required String phone,
+    required String gender,
+    required DateTime birthday,
+  }) {
+    return _firestore.collection(AppConstants.usersCollection).doc(uid).update(
+      <String, dynamic>{
+        'name': name.trim(),
+        'phone': phone.trim(),
+        'gender': gender,
+        'birthday': Timestamp.fromDate(birthday),
+      },
+    );
+  }
+
+  Future<void> updatePhotoUrl({required String uid, required String photoUrl}) {
+    return _firestore.collection(AppConstants.usersCollection).doc(uid).update(
+      <String, dynamic>{'photoUrl': photoUrl},
+    );
   }
 
   Future<void> sendPasswordResetEmail(String email) {

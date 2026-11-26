@@ -1,12 +1,14 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants.dart';
 import '../../models/room.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/rooms_provider.dart';
 import '../../services/room_service.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_view.dart';
+import '../../widgets/load_more_button.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/room_card.dart';
 import 'room_detail_screen.dart';
@@ -23,6 +25,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   RoomStatus? _statusFilter;
+  int _visibleCount = AppConstants.pageSize;
 
   @override
   void dispose() {
@@ -43,16 +46,11 @@ class _RoomsScreenState extends State<RoomsScreen> {
   Future<void> _openForm({Room? room}) async {
     final user = context.read<AuthProvider>().user;
     if (user == null) return;
-    final saved = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => RoomFormScreen(ownerId: user.uid, room: room),
       ),
     );
-    if (saved == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(room == null ? 'Room added.' : 'Room updated.')),
-      );
-    }
   }
 
   Future<void> _deleteRoom(Room room) async {
@@ -101,6 +99,8 @@ class _RoomsScreenState extends State<RoomsScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<RoomsProvider>();
     final rooms = _filtered(provider.rooms);
+    final visible = rooms.take(_visibleCount).toList();
+    final remaining = rooms.length - visible.length;
     final hasRooms = provider.rooms.isNotEmpty;
 
     return Scaffold(
@@ -120,12 +120,18 @@ class _RoomsScreenState extends State<RoomsScreen> {
                         tooltip: 'Clear search',
                         onPressed: () {
                           _searchController.clear();
-                          setState(() => _query = '');
+                          setState(() {
+                            _query = '';
+                            _visibleCount = AppConstants.pageSize;
+                          });
                         },
                         icon: const Icon(Icons.close_rounded),
                       ),
               ),
-              onChanged: (value) => setState(() => _query = value),
+              onChanged: (value) => setState(() {
+                _query = value;
+                _visibleCount = AppConstants.pageSize;
+              }),
             ),
           ),
           const SizedBox(height: 10),
@@ -137,14 +143,20 @@ class _RoomsScreenState extends State<RoomsScreen> {
                 _FilterChip(
                   label: 'All',
                   selected: _statusFilter == null,
-                  onSelected: () => setState(() => _statusFilter = null),
+                  onSelected: () => setState(() {
+                    _statusFilter = null;
+                    _visibleCount = AppConstants.pageSize;
+                  }),
                 ),
                 for (final status in RoomStatus.values) ...<Widget>[
                   const SizedBox(width: 8),
                   _FilterChip(
                     label: status.label,
                     selected: _statusFilter == status,
-                    onSelected: () => setState(() => _statusFilter = status),
+                    onSelected: () => setState(() {
+                      _statusFilter = status;
+                      _visibleCount = AppConstants.pageSize;
+                    }),
                   ),
                 ],
               ],
@@ -187,7 +199,7 @@ class _RoomsScreenState extends State<RoomsScreen> {
                             ),
                     )
                   else
-                    for (final room in rooms) ...<Widget>[
+                    for (final room in visible) ...<Widget>[
                       RoomCard(
                         room: room,
                         onTap: () => _openDetail(room),
@@ -215,6 +227,13 @@ class _RoomsScreenState extends State<RoomsScreen> {
                       ),
                       const SizedBox(height: 10),
                     ],
+                  if (remaining > 0)
+                    LoadMoreButton(
+                      remaining: remaining,
+                      onPressed: () => setState(
+                        () => _visibleCount += AppConstants.pageSize,
+                      ),
+                    ),
                 ],
               ),
             ),

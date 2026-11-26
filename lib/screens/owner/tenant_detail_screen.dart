@@ -11,6 +11,7 @@ import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/room_card.dart';
 import '../../widgets/section_header.dart';
+import '../../widgets/user_avatar.dart';
 import 'room_detail_screen.dart';
 
 class TenantDetailScreen extends StatelessWidget {
@@ -148,17 +149,10 @@ class _ProfileCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: <Widget>[
-            CircleAvatar(
+            UserAvatar(
+              name: tenant.name,
+              photoUrl: tenant.photoUrl,
               radius: 36,
-              backgroundColor: scheme.primaryContainer,
-              child: Text(
-                AppHelpers.initials(tenant.name),
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
             ),
             const SizedBox(height: 12),
             Text(

@@ -4,9 +4,14 @@ import 'package:provider/provider.dart';
 import 'core/constants.dart';
 import 'core/theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/maintenance_provider.dart';
 import 'providers/payments_provider.dart';
 import 'providers/reservations_provider.dart';
 import 'providers/rooms_provider.dart';
+import 'providers/tenant_maintenance_provider.dart';
+import 'providers/tenant_payments_provider.dart';
+import 'providers/tenant_reservations_provider.dart';
+import 'providers/tenant_rooms_provider.dart';
 import 'providers/tenants_provider.dart';
 import 'screens/auth/auth_gate.dart';
 import 'widgets/session_guard.dart';
@@ -37,6 +42,21 @@ class _BoardEaseAppState extends State<BoardEaseApp> {
         ),
         ChangeNotifierProvider<TenantsProvider>(
           create: (_) => TenantsProvider(),
+        ),
+        ChangeNotifierProvider<MaintenanceProvider>(
+          create: (_) => MaintenanceProvider(),
+        ),
+        ChangeNotifierProvider<TenantRoomsProvider>(
+          create: (_) => TenantRoomsProvider(),
+        ),
+        ChangeNotifierProvider<TenantReservationsProvider>(
+          create: (_) => TenantReservationsProvider(),
+        ),
+        ChangeNotifierProvider<TenantPaymentsProvider>(
+          create: (_) => TenantPaymentsProvider(),
+        ),
+        ChangeNotifierProvider<TenantMaintenanceProvider>(
+          create: (_) => TenantMaintenanceProvider(),
         ),
       ],
       child: MaterialApp(

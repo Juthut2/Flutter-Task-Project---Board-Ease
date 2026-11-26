@@ -50,6 +50,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _google() async {
+    final auth = context.read<AuthProvider>();
+    final success = await auth.signInWithGoogle();
+    if (!mounted || success) return;
+    AppHelpers.showSnackBar(
+      context,
+      auth.errorMessage ?? 'Google sign-in failed. Please try again.',
+      isError: true,
+    );
+  }
+
   void _openForgotPassword() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -175,6 +186,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               )
                             : const Text('Sign in'),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: busy || lockedOut ? null : _google,
+                        icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                        label: const Text('Continue with Google'),
                       ),
                       const SizedBox(height: 24),
                       Row(

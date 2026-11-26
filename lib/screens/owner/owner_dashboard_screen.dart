@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 import '../../core/owner_stats.dart';
 import '../../models/room.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/maintenance_provider.dart';
 import '../../providers/payments_provider.dart';
 import '../../providers/reservations_provider.dart';
 import '../../providers/rooms_provider.dart';
+import '../../widgets/complete_profile_banner.dart';
 import '../../widgets/dashboard_attention_card.dart';
 import '../../widgets/dashboard_greeting_card.dart';
 import '../../widgets/dashboard_stats_grid.dart';
@@ -15,6 +17,8 @@ import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/room_card.dart';
 import '../../widgets/section_header.dart';
+import '../shared/profile_screen.dart';
+import 'overdue_tenants_screen.dart';
 import 'room_detail_screen.dart';
 import 'room_form_screen.dart';
 
@@ -32,6 +36,7 @@ class OwnerDashboardScreen extends StatelessWidget {
     context.read<RoomsProvider>().retry();
     context.read<ReservationsProvider>().retry();
     context.read<PaymentsProvider>().retry();
+    context.read<MaintenanceProvider>().retry();
   }
 
   Future<void> _refreshAsync(BuildContext context) async {
@@ -64,6 +69,16 @@ class OwnerDashboardScreen extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: <Widget>[
+          if (!user.hasCompleteProfile) ...<Widget>[
+            CompleteProfileBanner(
+              onComplete: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ProfileScreen(startInEditMode: true),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           DashboardGreetingCard(name: user.name, roomCount: stats.totalRooms),
           if (error != null) ...[
             const SizedBox(height: 16),
@@ -86,6 +101,7 @@ class OwnerDashboardScreen extends StatelessWidget {
             DashboardStatsGrid(
               stats: stats,
               onOpenReservations: onOpenReservations,
+              onOpenOverdue: () => _openOverdue(context),
             ),
           const SizedBox(height: 22),
           SectionHeader(title: 'Quick actions'),
@@ -118,6 +134,7 @@ class OwnerDashboardScreen extends StatelessWidget {
             pending: stats.pendingReservations,
             overdue: stats.overdueTenants,
             onOpenReservations: onOpenReservations,
+            onOpenOverdue: () => _openOverdue(context),
           ),
           const SizedBox(height: 22),
           SectionHeader(
@@ -163,6 +180,12 @@ class OwnerDashboardScreen extends StatelessWidget {
       MaterialPageRoute<void>(
         builder: (_) => RoomDetailScreen(roomId: room.id),
       ),
+    );
+  }
+
+  void _openOverdue(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const OverdueTenantsScreen()),
     );
   }
 }

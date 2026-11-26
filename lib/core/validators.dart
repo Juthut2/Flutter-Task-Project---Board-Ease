@@ -1,3 +1,5 @@
+import 'constants.dart';
+
 /// Shared form validators. Every validator trims text before checking it.
 class Validators {
   const Validators._();
@@ -68,6 +70,23 @@ class Validators {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return null;
     return phone(text);
+  }
+
+  static String? birthday(DateTime? value) {
+    if (value == null) return 'Birthday is required';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final birth = DateTime(value.year, value.month, value.day);
+    if (birth.isAfter(today)) return 'Birthday cannot be in the future';
+    var age = today.year - birth.year;
+    if (today.month < birth.month ||
+        (today.month == birth.month && today.day < birth.day)) {
+      age -= 1;
+    }
+    if (age < AppConstants.minimumAge) {
+      return 'You must be at least ${AppConstants.minimumAge} years old';
+    }
+    return null;
   }
 
   static String? amount(String? value, {String field = 'Amount'}) {

@@ -35,16 +35,22 @@ class ImageUploadService {
   final ImagePicker _picker;
   final http.Client _client;
 
-  Future<String?> pickAndUpload({required ImageSource source}) async {
+  Future<String?> pickAndUpload({
+    required ImageSource source,
+    bool compressAlways = false,
+    int maxWidth = 1600,
+    int maxHeight = 1600,
+    int imageQuality = 82,
+  }) async {
     try {
       final picked = await _picker.pickImage(
         source: source,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 82,
+        maxWidth: maxWidth.toDouble(),
+        maxHeight: maxHeight.toDouble(),
+        imageQuality: imageQuality,
       );
       if (picked == null) return null;
-      return await upload(picked);
+      return await upload(picked, compressAlways: compressAlways);
     } on ImageUploadFailure {
       rethrow;
     } catch (_) {
@@ -54,7 +60,7 @@ class ImageUploadService {
     }
   }
 
-  Future<String> upload(XFile file) async {
+  Future<String> upload(XFile file, {bool compressAlways = false}) async {
     final extension = _extensionFor(file);
     if (extension.isEmpty) {
       throw const ImageUploadFailure('Choose a JPG, PNG, WebP, or HEIC image.');
@@ -64,7 +70,7 @@ class ImageUploadService {
     if (bytes.isEmpty) {
       throw const ImageUploadFailure('That image file is empty.');
     }
-    if (bytes.length > AppConstants.maxImageBytes) {
+    if (compressAlways || bytes.length > AppConstants.maxImageBytes) {
       bytes = await _compress(file, bytes);
     }
     if (bytes.length > AppConstants.maxImageBytes) {

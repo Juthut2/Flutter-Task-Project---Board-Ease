@@ -2,13 +2,15 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../providers/maintenance_provider.dart';
 import '../../providers/payments_provider.dart';
 import '../../providers/reservations_provider.dart';
 import '../../providers/rooms_provider.dart';
 import '../../providers/tenants_provider.dart';
+import '../../widgets/user_avatar.dart';
 import '../shared/account_screen.dart';
 import 'owner_dashboard_screen.dart';
-import 'reservations_screen.dart';
+import 'requests_hub_screen.dart';
 import 'rooms_screen.dart';
 import 'tenants_screen.dart';
 
@@ -25,12 +27,13 @@ class _OwnerShellState extends State<OwnerShell> {
   late final ReservationsProvider _reservations;
   late final PaymentsProvider _payments;
   late final TenantsProvider _tenants;
+  late final MaintenanceProvider _maintenance;
   late final List<Widget> _tabs;
 
   static const List<String> _titles = <String>[
     'Dashboard',
     'Rooms',
-    'Reservation requests',
+    'Requests',
     'Tenants',
     'Account',
   ];
@@ -42,13 +45,14 @@ class _OwnerShellState extends State<OwnerShell> {
     _reservations = context.read<ReservationsProvider>();
     _payments = context.read<PaymentsProvider>();
     _tenants = context.read<TenantsProvider>();
+    _maintenance = context.read<MaintenanceProvider>();
     _tabs = <Widget>[
       OwnerDashboardScreen(
         onOpenRooms: () => _select(1),
         onOpenReservations: () => _select(2),
       ),
       const RoomsScreen(),
-      const ReservationsScreen(),
+      const RequestsHubScreen(),
       const TenantsScreen(),
       const AccountScreen(),
     ];
@@ -59,6 +63,7 @@ class _OwnerShellState extends State<OwnerShell> {
       _reservations.watchAll();
       _payments.watchAll();
       _tenants.watchTenants();
+      _maintenance.watchAll();
     });
   }
 
@@ -68,6 +73,7 @@ class _OwnerShellState extends State<OwnerShell> {
     _reservations.stop();
     _payments.stop();
     _tenants.stop();
+    _maintenance.stop();
     super.dispose();
   }
 
@@ -78,11 +84,41 @@ class _OwnerShellState extends State<OwnerShell> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
     final rooms = context.watch<RoomsProvider>().rooms;
-    final pending = context.watch<ReservationsProvider>().pendingCount(rooms);
+    final roomIds = rooms.map((room) => room.id).toSet();
+    final pendingReservations = context
+        .watch<ReservationsProvider>()
+        .pendingCount(rooms);
+    final pendingMaintenance = context
+        .watch<MaintenanceProvider>()
+        .pendingCountFor(roomIds);
+    final pendingPayments = context.watch<PaymentsProvider>().pendingCountFor(
+      roomIds,
+    );
+    final pending = pendingReservations + pendingMaintenance + pendingPayments;
 
     return Scaffold(
-      appBar: AppBar(title: Text(_titles[_index])),
+      appBar: AppBar(
+        title: Text(_titles[_index]),
+        actions: <Widget>[
+          if (user != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: Tooltip(
+                  message: 'Profile',
+                  child: UserAvatar(
+                    name: user.name,
+                    photoUrl: user.photoUrl,
+                    radius: 16,
+                    onTap: () => _select(4),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

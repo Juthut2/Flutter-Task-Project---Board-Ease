@@ -10,10 +10,12 @@ class DashboardStatsGrid extends StatelessWidget {
     super.key,
     required this.stats,
     required this.onOpenReservations,
+    required this.onOpenOverdue,
   });
 
   final OwnerStats stats;
   final VoidCallback onOpenReservations;
+  final VoidCallback onOpenOverdue;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +66,7 @@ class DashboardStatsGrid extends StatelessWidget {
             icon: Icons.warning_amber_rounded,
             color: const Color(0xFFB3261E),
             caption: 'No payment this month',
+            onTap: onOpenOverdue,
           ),
         ];
         return Wrap(

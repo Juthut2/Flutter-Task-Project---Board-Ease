@@ -1,14 +1,16 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/helpers.dart';
+import '../../core/constants.dart';
 import '../../models/app_user.dart';
 import '../../models/room.dart';
 import '../../providers/rooms_provider.dart';
 import '../../providers/tenants_provider.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_view.dart';
+import '../../widgets/load_more_button.dart';
 import '../../widgets/loading_view.dart';
+import '../../widgets/user_avatar.dart';
 import 'tenant_detail_screen.dart';
 
 class TenantsScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class TenantsScreen extends StatefulWidget {
 class _TenantsScreenState extends State<TenantsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  int _visibleCount = AppConstants.pageSize;
 
   @override
   void dispose() {
@@ -53,6 +56,8 @@ class _TenantsScreenState extends State<TenantsScreen> {
     final tenantsProvider = context.watch<TenantsProvider>();
     final roomsProvider = context.watch<RoomsProvider>();
     final tenants = _filtered(tenantsProvider.tenants);
+    final visible = tenants.take(_visibleCount).toList();
+    final remaining = tenants.length - visible.length;
     final hasTenants = tenantsProvider.tenants.isNotEmpty;
     final scheme = Theme.of(context).colorScheme;
 
@@ -72,12 +77,18 @@ class _TenantsScreenState extends State<TenantsScreen> {
                       tooltip: 'Clear search',
                       onPressed: () {
                         _searchController.clear();
-                        setState(() => _query = '');
+                        setState(() {
+                          _query = '';
+                          _visibleCount = AppConstants.pageSize;
+                        });
                       },
                       icon: const Icon(Icons.close_rounded),
                     ),
             ),
-            onChanged: (value) => setState(() => _query = value),
+            onChanged: (value) => setState(() {
+              _query = value;
+              _visibleCount = AppConstants.pageSize;
+            }),
           ),
         ),
         Padding(
@@ -133,7 +144,7 @@ class _TenantsScreenState extends State<TenantsScreen> {
                               'their email.',
                   )
                 else
-                  for (final tenant in tenants) ...<Widget>[
+                  for (final tenant in visible) ...<Widget>[
                     _TenantTile(
                       tenant: tenant,
                       room: _roomFor(roomsProvider.rooms, tenant.uid),
@@ -146,6 +157,12 @@ class _TenantsScreenState extends State<TenantsScreen> {
                     ),
                     const SizedBox(height: 10),
                   ],
+                if (remaining > 0)
+                  LoadMoreButton(
+                    remaining: remaining,
+                    onPressed: () =>
+                        setState(() => _visibleCount += AppConstants.pageSize),
+                  ),
               ],
             ),
           ),
@@ -174,15 +191,10 @@ class _TenantTile extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: scheme.primaryContainer,
-          child: Text(
-            AppHelpers.initials(tenant.name),
-            style: TextStyle(
-              color: scheme.onPrimaryContainer,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        leading: UserAvatar(
+          name: tenant.name,
+          photoUrl: tenant.photoUrl,
+          radius: 22,
         ),
         title: Text(
           tenant.name,

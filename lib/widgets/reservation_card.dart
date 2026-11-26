@@ -5,6 +5,7 @@ import '../models/app_user.dart';
 import '../models/reservation.dart';
 import '../models/room.dart';
 import 'status_chip.dart';
+import 'user_avatar.dart';
 
 /// Reservation summary with owner approval actions for pending requests.
 class ReservationCard extends StatelessWidget {
@@ -51,22 +52,40 @@ class ReservationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              tenant?.name ?? 'Tenant',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              room?.name ?? 'Room removed',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                UserAvatar(
+                  name: tenant?.name ?? 'Tenant',
+                  photoUrl: tenant?.photoUrl,
+                  radius: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        tenant?.name ?? 'Tenant',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        room?.name ?? 'Room removed',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             Row(

@@ -28,6 +28,7 @@ dependencies:
   # UI and formatting
   lottie: ^3.8.2
   intl: ^0.20.3
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
@@ -36,3 +37,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/animations/success.json

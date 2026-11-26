@@ -24,12 +24,27 @@ class AppConstants {
   // Pagination.
   static const int pageSize = 20;
 
+  // Profile.
+  static const int minimumAge = 18;
+  static const Map<String, String> genderOptions = <String, String>{
+    'male': 'Male',
+    'female': 'Female',
+    'prefer_not_to_say': 'Prefer not to say',
+  };
+
   // Firestore collections.
   static const String usersCollection = 'users';
   static const String roomsCollection = 'rooms';
   static const String reservationsCollection = 'reservations';
   static const String paymentsCollection = 'payments';
   static const String maintenanceCollection = 'maintenance';
+
+  // Google Sign-In server (web) client ID, if not provided by
+  // google-services.json. Supply it with:
+  // flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=...apps.googleusercontent.com
+  static const String googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+  );
 
   // PSGC API.
   static const String psgcBaseUrl = 'https://psgc.gitlab.io/api';

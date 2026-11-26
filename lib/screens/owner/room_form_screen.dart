@@ -12,6 +12,7 @@ import '../../widgets/room_house_fields.dart';
 import '../../widgets/room_photo_picker.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/status_chip.dart';
+import '../../widgets/success_dialog.dart';
 
 class RoomFormScreen extends StatefulWidget {
   const RoomFormScreen({super.key, required this.ownerId, this.room});
@@ -129,6 +130,14 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
       } else {
         await provider.updateRoom(room);
       }
+      if (!mounted) return;
+      await SuccessDialog.show(
+        context,
+        title: existing == null ? 'Room added!' : 'Room updated!',
+        message: existing == null
+            ? 'Tenants can now find and reserve this room.'
+            : 'Your room details are up to date.',
+      );
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on RoomFailure catch (error) {

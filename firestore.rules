@@ -88,14 +88,53 @@ service cloud.firestore {
           'name', 'email', 'phone', 'role', 'createdAt'
         ])
         && request.resource.data.keys().hasOnly([
-          'name', 'email', 'phone', 'role', 'createdAt'
-        ]);
+          'name', 'email', 'phone', 'role', 'createdAt',
+          'gender', 'birthday', 'photoUrl'
+        ])
+        && (
+          !request.resource.data.keys().hasAny(['gender'])
+          || request.resource.data.gender == null
+          || request.resource.data.gender in [
+            'male', 'female', 'prefer_not_to_say'
+          ]
+        )
+        && (
+          !request.resource.data.keys().hasAny(['birthday'])
+          || request.resource.data.birthday == null
+          || request.resource.data.birthday is timestamp
+        )
+        && (
+          !request.resource.data.keys().hasAny(['photoUrl'])
+          || request.resource.data.photoUrl == null
+          || request.resource.data.photoUrl is string
+        );
 
       allow update: if isSelf(userId)
         && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.diff(resource.data)
              .affectedKeys()
-             .hasOnly(['name', 'email', 'phone']);
+             .hasOnly([
+               'name', 'phone', 'gender', 'birthday', 'photoUrl'
+             ])
+        && (
+          !request.resource.data.keys().hasAny(['gender'])
+          || request.resource.data.gender == null
+          || request.resource.data.gender in [
+            'male', 'female', 'prefer_not_to_say'
+          ]
+        )
+        && (
+          !request.resource.data.keys().hasAny(['birthday'])
+          || request.resource.data.birthday == null
+          || request.resource.data.birthday is timestamp
+        )
+        && (
+          !request.resource.data.keys().hasAny(['photoUrl'])
+          || request.resource.data.photoUrl == null
+          || request.resource.data.photoUrl is string
+        );
 
       allow delete: if false;
     }
@@ -172,12 +211,15 @@ service cloud.firestore {
         && request.resource.data.tenantId == currentUid()
         && request.resource.data.status == 'pending'
         && isNonEmptyString(request.resource.data.roomId)
+        && roomExists(request.resource.data.roomId)
+        && roomData(request.resource.data.roomId).tenantId == currentUid()
         && request.resource.data.amount is number
         && request.resource.data.amount > 0
         && isNonEmptyString(request.resource.data.month)
         && request.resource.data.month.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
         && request.resource.data.proofUrl is string
-        && request.resource.data.proofUrl.matches('^https://res\\.cloudinary\\.com/.+')
+        && request.resource.data.proofUrl.matches(
+            '^https://res\\.cloudinary\\.com/.+')
         && request.resource.data.createdAt is timestamp;
 
       allow update: if isOwner()
@@ -203,6 +245,8 @@ service cloud.firestore {
         && request.resource.data.tenantId == currentUid()
         && request.resource.data.status == 'pending'
         && isNonEmptyString(request.resource.data.roomId)
+        && roomExists(request.resource.data.roomId)
+        && roomData(request.resource.data.roomId).tenantId == currentUid()
         && isNonEmptyString(request.resource.data.title)
         && isNonEmptyString(request.resource.data.description)
         && (

@@ -6,6 +6,7 @@ import '../../core/validators.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/message_banner.dart';
 import '../../widgets/password_field.dart';
+import '../../widgets/profile_details_fields.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -21,6 +22,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
+  String? _gender;
+  DateTime? _birthday;
   bool _submitting = false;
 
   @override
@@ -36,6 +39,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
+    final gender = _gender;
+    final birthday = _birthday;
+    if (gender == null || birthday == null) return;
 
     final auth = context.read<AuthProvider>();
     setState(() => _submitting = true);
@@ -44,6 +50,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       email: _emailController.text.trim(),
       phone: _phoneController.text.trim(),
       password: _passwordController.text.trim(),
+      gender: gender,
+      birthday: birthday,
     );
     if (!mounted) return;
     setState(() => _submitting = false);
@@ -53,6 +61,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
       AppHelpers.showSnackBar(
         context,
         auth.errorMessage ?? 'Registration failed. Please try again.',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _google() async {
+    final auth = context.read<AuthProvider>();
+    final success = await auth.signInWithGoogle();
+    if (!mounted) return;
+    if (success) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      AppHelpers.showSnackBar(
+        context,
+        auth.errorMessage ?? 'Google sign-in failed. Please try again.',
         isError: true,
       );
     }
@@ -130,6 +153,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    ProfileDetailsFields(
+                      gender: _gender,
+                      onGenderChanged: (value) =>
+                          setState(() => _gender = value),
+                      birthday: _birthday,
+                      onBirthdayChanged: (value) =>
+                          setState(() => _birthday = value),
+                      enabled: !busy,
+                    ),
+                    const SizedBox(height: 16),
                     TextFormField(
                       controller: _emailController,
                       enabled: !busy,
@@ -185,10 +218,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             )
                           : const Text('Create account'),
                     ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: <Widget>[
+                        const Expanded(child: Divider()),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'or',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        const Expanded(child: Divider()),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: busy ? null : _google,
+                      icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                      label: const Text('Continue with Google'),
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'A verification link will be sent to your email. You '
-                      'must verify it before using the app.',
+                      'must verify it before using the app. Google accounts '
+                      'are already verified.',
                       textAlign: TextAlign.center,
                       style: textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,

@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants.dart';
+import '../../core/helpers.dart';
 import '../../models/reservation.dart';
 import '../../providers/reservations_provider.dart';
 import '../../providers/rooms_provider.dart';
@@ -8,8 +10,10 @@ import '../../providers/tenants_provider.dart';
 import '../../services/reservation_service.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_view.dart';
+import '../../widgets/load_more_button.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/reservation_card.dart';
+import '../../widgets/success_dialog.dart';
 
 class ReservationsScreen extends StatefulWidget {
   const ReservationsScreen({super.key});
@@ -21,6 +25,7 @@ class ReservationsScreen extends StatefulWidget {
 class _ReservationsScreenState extends State<ReservationsScreen> {
   bool _pendingOnly = true;
   String? _busyId;
+  int _visibleCount = AppConstants.pageSize;
 
   Future<void> _decide(Reservation reservation, {required bool approve}) async {
     final roomsProvider = context.read<RoomsProvider>();
@@ -62,25 +67,26 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
         approve: approve,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            approve
-                ? 'Reservation approved. The room is now occupied.'
-                : 'Reservation declined.',
-          ),
-        ),
-      );
+      if (approve) {
+        await SuccessDialog.show(
+          context,
+          title: 'Reservation approved!',
+          message:
+              'The room is now marked occupied and the tenant can start '
+              'submitting rent payments.',
+        );
+      } else {
+        AppHelpers.showSnackBar(context, 'Reservation declined.');
+      }
     } on ReservationFailure catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      AppHelpers.showSnackBar(context, error.message, isError: true);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not update the request. Please try again.'),
-        ),
+      AppHelpers.showSnackBar(
+        context,
+        'Could not update the request. Please try again.',
+        isError: true,
       );
     } finally {
       if (mounted) setState(() => _busyId = null);
@@ -99,7 +105,11 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
       if (a.isPending != b.isPending) return a.isPending ? -1 : 1;
       return b.createdAt.compareTo(a.createdAt);
     });
-    final isLoading = reservationsProvider.isLoading && all.isEmpty;
+    final paged = visible.take(_visibleCount).toList();
+    final remaining = visible.length - paged.length;
+    final isLoading =
+        (reservationsProvider.isLoading && all.isEmpty) ||
+        (roomsProvider.isLoading && roomsProvider.rooms.isEmpty);
     final error =
         reservationsProvider.errorMessage ?? roomsProvider.errorMessage;
 
@@ -122,7 +132,10 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
               FilterChip(
                 label: const Text('Pending only'),
                 selected: _pendingOnly,
-                onSelected: (value) => setState(() => _pendingOnly = value),
+                onSelected: (value) => setState(() {
+                  _pendingOnly = value;
+                  _visibleCount = AppConstants.pageSize;
+                }),
               ),
             ],
           ),
@@ -159,14 +172,16 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                         : 'New tenant requests will appear here for review.',
                     action: _pendingOnly && all.isNotEmpty
                         ? OutlinedButton(
-                            onPressed: () =>
-                                setState(() => _pendingOnly = false),
+                            onPressed: () => setState(() {
+                              _pendingOnly = false;
+                              _visibleCount = AppConstants.pageSize;
+                            }),
                             child: const Text('Show all requests'),
                           )
                         : null,
                   )
                 else
-                  for (final reservation in visible) ...<Widget>[
+                  for (final reservation in paged) ...<Widget>[
                     ReservationCard(
                       reservation: reservation,
                       room: roomsProvider.roomById(reservation.roomId),
@@ -177,6 +192,12 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                     ),
                     const SizedBox(height: 10),
                   ],
+                if (remaining > 0)
+                  LoadMoreButton(
+                    remaining: remaining,
+                    onPressed: () =>
+                        setState(() => _visibleCount += AppConstants.pageSize),
+                  ),
               ],
             ),
           ),

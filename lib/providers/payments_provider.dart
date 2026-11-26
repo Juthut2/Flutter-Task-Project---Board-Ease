@@ -52,6 +52,21 @@ class PaymentsProvider extends ChangeNotifier {
 
   void retry() => watchAll(force: true);
 
+  Future<void> decide(Payment payment, {required bool approve}) {
+    return _service.decide(paymentId: payment.id, approve: approve);
+  }
+
+  int get pendingCount =>
+      _payments.where((item) => item.status == PaymentStatus.pending).length;
+
+  int pendingCountFor(Set<String> roomIds) => _payments
+      .where(
+        (item) =>
+            item.status == PaymentStatus.pending &&
+            roomIds.contains(item.roomId),
+      )
+      .length;
+
   void stop() {
     _subscription?.cancel();
     _subscription = null;
